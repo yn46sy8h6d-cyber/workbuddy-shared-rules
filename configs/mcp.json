@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "xiaohongshu-mcp": {
+      "type": "sse",
+      "url": "http://localhost:18060/mcp"
+    },
+    "autoclaw": {
+      "type": "sse",
+      "url": "http://localhost:18789/mcp"
+    },
+    "codex": {
+      "type": "sse",
+      "url": "http://localhost:18766/mcp"
+    }
+  }
+}

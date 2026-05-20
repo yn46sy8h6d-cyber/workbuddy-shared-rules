@@ -1,0 +1,59 @@
+{
+  "models": [
+    {
+      "id": "deepseek-v4-flash",
+      "name": "DeepSeek-V4-Flash (直连)",
+      "vendor": "DeepSeek",
+      "url": "https://api.deepseek.com/v1/chat/completions",
+      "apiKey": "sk-ff6582a4540440aaab652d68b6c728dd",
+      "maxInputTokens": 1000000,
+      "maxOutputTokens": 8192,
+      "supportsToolCall": true,
+      "supportsImages": true
+    },
+    {
+      "id": "Qwen/Qwen3-Coder-30B-A3B-Instruct",
+      "name": "Qwen3-Coder-30B (硅基流动)",
+      "vendor": "SiliconFlow",
+      "url": "https://api.siliconflow.cn/v1/chat/completions",
+      "apiKey": "sk-efcbmwedkbobbqkuglblpwlglknjroxqyqalgxyvdbpzlnnl",
+      "maxInputTokens": 32768,
+      "maxOutputTokens": 4096,
+      "supportsToolCall": true,
+      "supportsImages": false
+    },
+    {
+      "id": "Qwen/Qwen3.6-35B-A3B",
+      "name": "Qwen3.6-35B (硅基流动)",
+      "vendor": "SiliconFlow",
+      "url": "https://api.siliconflow.cn/v1/chat/completions",
+      "apiKey": "sk-efcbmwedkbobbqkuglblpwlglknjroxqyqalgxyvdbpzlnnl",
+      "maxInputTokens": 32768,
+      "maxOutputTokens": 4096,
+      "supportsToolCall": true,
+      "supportsImages": false
+    },
+    {
+      "id": "Qwen/Qwen3-VL-32B-Instruct",
+      "name": "Qwen3-VL-32B 视觉 (硅基流动)",
+      "vendor": "SiliconFlow",
+      "url": "https://api.siliconflow.cn/v1/chat/completions",
+      "apiKey": "sk-efcbmwedkbobbqkuglblpwlglknjroxqyqalgxyvdbpzlnnl",
+      "maxInputTokens": 32768,
+      "maxOutputTokens": 4096,
+      "supportsToolCall": true,
+      "supportsImages": true
+    },
+    {
+      "id": "deepseek-ai/DeepSeek-V4-Flash",
+      "name": "DeepSeek-V4-Flash (硅基流动备用)",
+      "vendor": "SiliconFlow",
+      "url": "https://api.siliconflow.cn/v1/chat/completions",
+      "apiKey": "sk-efcbmwedkbobbqkuglblpwlglknjroxqyqalgxyvdbpzlnnl",
+      "maxInputTokens": 1000000,
+      "maxOutputTokens": 8192,
+      "supportsToolCall": true,
+      "supportsImages": true
+    }
+  ]
+}
