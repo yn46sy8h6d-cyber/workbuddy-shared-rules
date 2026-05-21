@@ -1,6 +1,6 @@
 #!/usr/bin/env swift
-// hotkey_route.swift - 剪贴板监测模式: 复制即路由
-// v2 — 改用 NSPasteboard changeCount 轮询，绕过 Accessibility 权限问题
+// hotkey_route.swift - 剪贴板监测模式 v3
+// 绕过 NSPasteboard 限制，改用 osascript 'the clipboard' 读内容
 // 编译: swiftc -o ~/Applications/HotkeyRoute.app/Contents/MacOS/HotkeyRoute hotkey_route.swift -framework AppKit -framework UserNotifications
 
 import AppKit
@@ -22,13 +22,31 @@ func debug(_ msg: String) {
     }
 }
 
-debug("=== HotkeyRoute v2 STARTED ===")
-
 // ─── 配置 ────────────────────────────────────────
 let logDir = FileManager.default.homeDirectoryForCurrentUser
     .appendingPathComponent(".workbuddy/logs")
-let logFile = "route_history.json"
-let maxLogEntries = 200
+
+// ─── 通过 osascript 读剪贴板 ─────────────────────
+func readClipboard() -> String? {
+    let task = Process()
+    task.launchPath = "/usr/bin/osascript"
+    task.arguments = ["-e", "the clipboard"]
+    
+    let pipe = Pipe()
+    task.standardOutput = pipe
+    task.standardError = FileHandle.nullDevice
+    
+    do {
+        try task.run()
+        task.waitUntilExit()
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        let content = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .newlines)
+        return content?.isEmpty == true ? nil : content
+    } catch {
+        debug("osa error: \(error.localizedDescription)")
+        return nil
+    }
+}
 
 // ─── 路由规则 ─────────────────────────────────────
 let codeKeywords: [String] = ["代码", "写代码", "函数", "debug", "class ", "重构", "写脚本", "bug", "编程", "程序", "api", "接口", "sql", "json", "python", "javascript", "shell", "报错"]
@@ -52,7 +70,7 @@ func routeModel(_ msg: String) -> (model: String, reason: String) {
 // ─── 日志 ─────────────────────────────────────────
 func logRoute(model: String, reason: String, preview: String) {
     try? FileManager.default.createDirectory(at: logDir, withIntermediateDirectories: true)
-    let path = logDir.appendingPathComponent(logFile)
+    let path = logDir.appendingPathComponent("route_history.json")
     
     var entries: [[String: String]] = []
     if let data = try? Data(contentsOf: path),
@@ -69,9 +87,7 @@ func logRoute(model: String, reason: String, preview: String) {
         "preview": preview
     ]
     entries.append(entry)
-    if entries.count > maxLogEntries {
-        entries = Array(entries.suffix(maxLogEntries))
-    }
+    if entries.count > 200 { entries = Array(entries.suffix(200)) }
     
     if let data = try? JSONSerialization.data(withJSONObject: entries, options: [.prettyPrinted]) {
         try? data.write(to: path)
@@ -89,39 +105,47 @@ func sendNotification(title: String, body: String) {
     UNUserNotificationCenter.current().add(request) { error in
         if let e = error { debug("NOTIFY ERROR: \(e.localizedDescription)") }
     }
-    debug("NOTIFY: \(title) - \(body.prefix(40))")
+    debug("NOTIFY: \(title)")
 }
 
 // ─── 启动 ─────────────────────────────────────────
-UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
+debug("=== HotkeyRoute v3 STARTED ===")
+
+// 先重置通知权限标识，重新请求
+// 通过删除旧的 UNUserNotificationCenter 委托来确保新请求
+UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
     debug("AUTH: granted=\(granted) error=\(error?.localizedDescription ?? "nil")")
 }
 
+var lastContent = ""
 var lastChangeCount = NSPasteboard.general.changeCount
-var lastProcessedContent = ""
+var unchangedCycles = 0  // 防抖
 
 debug("INIT: changeCount=\(lastChangeCount)")
 
-Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { _ in
     let pb = NSPasteboard.general
     let current = pb.changeCount
     
     guard current != lastChangeCount else { return }
-    debug("CHANGE: \(lastChangeCount) -> \(current)")
     lastChangeCount = current
+    debug("CHANGE: \(current)")
     
-    // 等待一小段时间确保内容完整写入
-    Thread.sleep(forTimeInterval: 0.05)
+    // 延时后通过 osascript 读取内容
+    Thread.sleep(forTimeInterval: 0.2)
     
-    guard let content = pb.string(forType: .string), !content.isEmpty else {
-        debug("CONTENT: empty or nil")
+    guard let content = readClipboard(), !content.isEmpty else {
+        debug("osa CONTENT: nil/empty")
         return
     }
-    guard content != lastProcessedContent else {
-        debug("CONTENT: same as last, skip")
+    
+    // 防抖：内容没变可能是连续复制同一东西
+    guard content != lastContent else {
+        debug("CONTENT: duplicate, skip")
         return
     }
-    lastProcessedContent = content
+    lastContent = content
+    unchangedCycles = 0
     
     let (model, reason) = routeModel(content)
     let preview = String(content.prefix(60))
