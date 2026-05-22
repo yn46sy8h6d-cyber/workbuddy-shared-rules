@@ -79,7 +79,7 @@ fi
 echo "[handoff-executor] ✅ ccb 执行完成"
 
 # ── 6. Git add + commit ──
-TASK_NAME=$(grep "^## Task" "$HANDOFF" | head -1 | sed 's/^## Task[:\s]*//' | xargs)
+TASK_NAME=$(grep "^## Task" "$HANDOFF" | head -1 | sed 's/^## Task[ 	]*//' | xargs)
 [ -z "$TASK_NAME" ] && TASK_NAME="handoff execution"
 
 COMMITTED=0
@@ -96,11 +96,50 @@ for DIR in $TARGET_DIRS; do
     fi
 done
 
-# ── 7. 标记完成 ──
-HANDOFF_NAME=$(basename "$HANDOFF")
+# ── 7. 标记完成 + 写入执行证据 ──
+HANDOFF_NAME=$(basename "$HANDOFF" .md)
 echo "" >> "$HANDOFF"
 echo "## Status: done" >> "$HANDOFF"
 echo "## Done at: $(date '+%Y-%m-%d %H:%M')" >> "$HANDOFF"
 echo "## Committed: $COMMITTED repos" >> "$HANDOFF"
+echo "" >> "$HANDOFF"
+echo "## 执行证据" >> "$HANDOFF"
+echo "" >> "$HANDOFF"
+echo '```' >> "$HANDOFF"
+EVIDENCE_TEXT=""
+for DIR in $TARGET_DIRS; do
+    if git -C "$DIR" rev-parse --git-dir 2>/dev/null >/dev/null; then
+        echo "--- $DIR ---" >> "$HANDOFF"
+        LOG_LINE=$(git -C "$DIR" log --oneline -1 2>/dev/null)
+        EVIDENCE_TEXT="$EVIDENCE_TEXT$LOG_LINE | "
+        git -C "$DIR" log --oneline -3 >> "$HANDOFF" 2>/dev/null
+        echo "" >> "$HANDOFF"
+        git -C "$DIR" show HEAD --stat >> "$HANDOFF" 2>/dev/null
+        echo "" >> "$HANDOFF"
+    fi
+done
+echo '```' >> "$HANDOFF"
+
+# ── 8. 写入 active.json —— Hermes 下次启动自动汇报 ──
+# 把执行证据写入 active.json 的 handoff_completed 字段
+# Hermes 每次启动必读 active.json（SOUL.md 第0条焊死）
+ACTIVE_JSON="$HOME/.hermes/at/tasks/active.json"
+if [ -f "$ACTIVE_JSON" ]; then
+    python3 -c "
+import json, datetime
+with open('$ACTIVE_JSON') as f:
+    data = json.load(f)
+data['handoff_completed'] = {
+    'name': '$TASK_NAME',
+    'commit': '$(git -C "$FIRST_DIR" rev-parse --short HEAD 2>/dev/null || echo "none")',
+    'files': '$(git -C "$FIRST_DIR" diff --stat HEAD~1..HEAD 2>/dev/null | tail -1 || echo "none")',
+    'time': '$(date '+%Y-%m-%d %H:%M')',
+    'handoff_file': '$HANDOFF_NAME'
+}
+with open('$ACTIVE_JSON', 'w') as f:
+    json.dump(data, f, ensure_ascii=False, indent=2)
+print('active.json updated')
+" 2>&1 || echo "[handoff-executor] ⚠️ active.json 更新失败"
+fi
 
 echo "[handoff-executor] ✅ 完成: $HANDOFF_NAME (committed: $COMMITTED)"
