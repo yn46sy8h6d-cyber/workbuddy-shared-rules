@@ -11,6 +11,11 @@
     "codex": {
       "type": "sse",
       "url": "http://localhost:18766/mcp"
+    },
+    "obscura": {
+      "command": "/Users/iii/Tools/obscura/obscura",
+      "args": ["mcp", "--stealth"],
+      "env": {}
     }
   }
 }
